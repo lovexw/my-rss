@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小吴的 RSS 订阅源</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 简单的通知提示动画 */
+        .toast { transition: opacity 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased min-h-screen p-6 md:p-12">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">RSS 订阅源展示台</h1>
+                <p class="text-gray-500 mt-2">在这里管理并分享我的信息流来源。</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="copyAllLinks()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors duration-200">
+                    复制全部链接
+                </button>
+                <button onclick="exportOPML()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-5 py-2.5 rounded-lg font-medium shadow-sm transition-colors duration-200">
+                    导出 OPML 文件
+                </button>
+            </div>
+        </header>
+
+        <main id="feeds-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></main>
+    </div>
+
+    <div id="toast" class="toast opacity-0 pointer-events-none fixed bottom-5 right-5 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+        复制成功！
+    </div>
+
+    <script>
+        // 你的 RSS 数据源 (从 OPML 提取并转化为 JSON 格式方便管理)
+        // 今后你需要添加、修改或删除 RSS，只需直接修改这个 data 数组即可
+        const data = [
+            {
+                category: "Blog",
+                items: [
+                    { title: "Tw93 Blog", htmlUrl: "https://tw93.fun", xmlUrl: "https://tw93.fun/feed.xml" },
+                    { title: "莫比乌斯", htmlUrl: "https://onojyun.com", xmlUrl: "https://onojyun.com/feed/" },
+                    { title: "Limboy's Essays", htmlUrl: "https://limboy.me/", xmlUrl: "https://limboy.me/index.xml" },
+                    { title: "Sindre Sorhus — Blog", htmlUrl: "https://sindresorhus.com", xmlUrl: "https://sindresorhus.com/rss.xml" },
+                    { title: "小吴乐意Blog", htmlUrl: "https://blog.xiaowuleyi.com/", xmlUrl: "https://blog.xiaowuleyi.com/rss.php" }
+                ]
+            },
+            {
+                category: "New",
+                items: [
+                    { title: "Randy's Blog", htmlUrl: "https://lutaonan.com", xmlUrl: "https://lutaonan.com/rss.xml" },
+                    { title: "吕小荣", htmlUrl: "http://mednoter.com", xmlUrl: "https://mednoter.com/feed.xml" },
+                    { title: "CatCoding", htmlUrl: "https://catcoding.me", xmlUrl: "https://catcoding.me/atom.xml" },
+                    { title: "夜行人", htmlUrl: "http://wwj718.github.io/", xmlUrl: "http://wwj718.github.io/index.xml" },
+                    { title: "如有乐享", htmlUrl: "https://51.ruyo.net", xmlUrl: "https://51.ruyo.net/feed" },
+                    { title: "土木坛子", htmlUrl: "https://tumutanzi.com", xmlUrl: "https://tumutanzi.com/feed" }
+                ]
+            },
+            {
+                category: "Weekly",
+                items: [
+                    { title: "龙爪槐守望者", htmlUrl: "https://www.ftium4.com", xmlUrl: "https://www.ftium4.com/rss.xml" },
+                    { title: "太隐", htmlUrl: "https://wangyurui.com/", xmlUrl: "https://wangyurui.com/feed.xml" },
+                    { title: "让小产品的独立变现更简单", htmlUrl: "http://github.com/dylang/node-rss", xmlUrl: "https://www.ezindie.com/feed/rss.xml" },
+                    { title: "潮流周刊", htmlUrl: "https://weekly.tw93.fun/", xmlUrl: "https://weekly.tw93.fun/rss.xml" },
+                    { title: "Sindre Sorhus — New Apps", htmlUrl: "https://sindresorhus.com", xmlUrl: "https://sindresorhus.com/rss-apps.xml" },
+                    { title: "阮一峰的网络日志", htmlUrl: "http://www.ruanyifeng.com/blog/", xmlUrl: "http://www.ruanyifeng.com/blog/atom.xml" }
+                ]
+            },
+            {
+                category: "公众号",
+                items: [
+                    { title: "饭统戴老板", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/worldofboss" },
+                    { title: "看理想", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/ikanlixiang" },
+                    { title: "caoz的梦呓", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/caozsay" },
+                    { title: "阑夕", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/techread" },
+                    { title: "十点读书", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/duhaoshu" },
+                    { title: "新世相", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/thefair2" },
+                    { title: "南方周末", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/nanfangzhoumo" },
+                    { title: "经济学人", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/theeconomist" },
+                    { title: "三联生活周刊", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/lifeweek" },
+                    { title: "人人都是产品经理", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/woshipm" },
+                    { title: "六神磊磊读金庸", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/dujinyong6" },
+                    { title: "笔记侠", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/Notesman" },
+                    { title: "一天一篇经济学人(双语)", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/Economist_fans" },
+                    { title: "地球知识局", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/diqiuzhishiju" },
+                    { title: "槽边往事", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/bitsea" },
+                    { title: "果壳网", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/Guokr42" },
+                    { title: "侠客岛", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/xiake_island" },
+                    { title: "财新网", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/caixinwang" },
+                    { title: "知识分子", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/The-Intellectual" },
+                    { title: "经济学原理", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/jingjixue_yuanli" },
+                    { title: "猫笔刀", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/maobidao" },
+                    { title: "X博士", htmlUrl: "#", xmlUrl: "https://plink.anyfeeder.com/weixin/doctorx666" }
+                ]
+            },
+            {
+                category: "时事新闻",
+                items: [
+                    { title: "纽约时报双语版", htmlUrl: "http://nytimes.com", xmlUrl: "https://plink.anyfeeder.com/nytimes/dual" },
+                    { title: "例行记者会_外交部", htmlUrl: "https://www.mfa.gov.cn/", xmlUrl: "https://rss.xiaowuleyi.com/gov/mfa/wjdt/fyrbt" }
+                ]
+            },
+            {
+                category: "轻松阅读",
+                items: [
+                    { title: "BTC Study", htmlUrl: "https://www.btcstudy.org", xmlUrl: "https://www.btcstudy.org/atom.xml" },
+                    { title: "少数派", htmlUrl: "https://sspai.com", xmlUrl: "https://sspai.com/feed" },
+                    { title: "月光博客", htmlUrl: "https://www.williamlong.info/", xmlUrl: "https://www.williamlong.info/rss.xml" },
+                    { title: "iDaily · 每日环球视野", htmlUrl: "https://idai.ly", xmlUrl: "https://rss.xiaowuleyi.com/idaily/today" },
+                    { title: "福利吧", htmlUrl: "https://fuliba2023.net", xmlUrl: "https://fuliba2023.net/feed" },
+                    { title: "NASA中文 - 天文每日一图", htmlUrl: "https://www.nasachina.cn/", xmlUrl: "https://rss.xiaowuleyi.com/nasa/apod-cn" },
+                    { title: "豆瓣最受欢迎的书评", htmlUrl: "https://book.douban.com", xmlUrl: "https://plink.anyfeeder.com/douban/review/book" },
+                    { title: "豆瓣最受欢迎的影评", htmlUrl: "https://movie.douban.com", xmlUrl: "https://plink.anyfeeder.com/douban/review/movie" }
+                ]
+            },
+            {
+                category: "追ing",
+                items: [
+                    { title: "知乎热榜", htmlUrl: "https://www.zhihu.com/hot", xmlUrl: "https://rss.xiaowuleyi.com/zhihu/hot" },
+                    { title: "折腾IOS内测频道", htmlUrl: "https://t.me/s/TossTF", xmlUrl: "https://rss.xiaowuleyi.com/telegram/channel/TossTF" },
+                    { title: "折腾实验室频道", htmlUrl: "https://t.me/s/TossLabChannel", xmlUrl: "https://rss.xiaowuleyi.com/telegram/channel/TossLabChannel" },
+                    { title: "科技圈在花频道", htmlUrl: "https://t.me/s/zaihuapd", xmlUrl: "https://rss.xiaowuleyi.com/telegram/channel/zaihuapd" }
+                ]
+            }
+        ];
+
+        // 渲染页面
+        function renderFeeds() {
+            const container = document.getElementById('feeds-container');
+            container.innerHTML = '';
+
+            data.forEach(group => {
+                const section = document.createElement('div');
+                section.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-5';
+                
+                let itemsHtml = group.items.map(item => `
+                    <div class="flex items-center justify-between py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors px-2 rounded -mx-2">
+                        <div class="truncate pr-4">
+                            <a href="${item.htmlUrl}" target="_blank" class="text-sm font-medium text-gray-800 hover:text-blue-600 truncate">${item.title}</a>
+                        </div>
+                        <button onclick="copyText('${item.xmlUrl}')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-md transition whitespace-nowrap">
+                            复制 RSS
+                        </button>
+                    </div>
+                `).join('');
+
+                section.innerHTML = `
+                    <h2 class="text-xl font-bold text-gray-800 border-b-2 border-blue-500 pb-2 inline-block mb-4">${group.category}</h2>
+                    <div class="flex flex-col">${itemsHtml}</div>
+                `;
+                container.appendChild(section);
+            });
+        }
+
+        // 复制单条文本内容
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("链接已复制！");
+            });
+        }
+
+        // 复制全部 RSS 链接
+        function copyAllLinks() {
+            const allUrls = data.flatMap(group => group.items.map(item => item.xmlUrl)).join('\n');
+            navigator.clipboard.writeText(allUrls).then(() => {
+                showToast("全部 RSS 链接已复制！");
+            });
+        }
+
+        // 导出 OPML 文件
+        function exportOPML() {
+            let opmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n<head>\n<title>Feeds</title>\n</head>\n<body>\n`;
+            
+            data.forEach(group => {
+                opmlContent += `  <outline title="${escapeXML(group.category)}" text="${escapeXML(group.category)}">\n`;
+                group.items.forEach(item => {
+                    opmlContent += `    <outline type="rss" title="${escapeXML(item.title)}" text="${escapeXML(item.title)}" htmlUrl="${escapeXML(item.htmlUrl)}" xmlUrl="${escapeXML(item.xmlUrl)}" />\n`;
+                });
+                opmlContent += `  </outline>\n`;
+            });
+            
+            opmlContent += `</body>\n</opml>`;
+
+            // 创建 Blob 并下载
+            const blob = new Blob([opmlContent], { type: 'text/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'feeds.opml';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("OPML 文件已导出！");
+        }
+
+        // XML 字符转义工具
+        function escapeXML(str) {
+            return str.replace(/[<>&'"]/g, function (c) {
+                switch (c) {
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '&': return '&amp;';
+                    case '\'': return '&apos;';
+                    case '"': return '&quot;';
+                }
+            });
+        }
+
+        // 显示通知
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+
+        // 初始化
+        renderFeeds();
+    </script>
+</body>
+</html>
